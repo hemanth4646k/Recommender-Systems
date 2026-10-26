@@ -1,0 +1,498 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NAS Collaborative Filtering - Interactive Visual Benchmark</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        :root {
+            --bg-primary: #0f172a;
+            --bg-secondary: #1e293b;
+            --bg-card: #334155;
+            --text-primary: #f8fafc;
+            --text-muted: #94a3b8;
+            --accent-nas: #ef4444;
+            --accent-blue: #38bdf8;
+            --accent-green: #22c55e;
+            --border: #475569;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            margin: 0;
+            padding: 24px;
+            background-color: var(--bg-primary);
+            color: var(--text-primary);
+            line-height: 1.5;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        header {
+            margin-bottom: 24px;
+            border-bottom: 1px solid var(--border);
+            padding-bottom: 16px;
+        }
+
+        h1 {
+            font-size: 26px;
+            margin: 0 0 8px 0;
+            color: #fff;
+        }
+
+        p.subtitle {
+            margin: 0;
+            color: var(--text-muted);
+            font-size: 14px;
+        }
+
+        .tabs {
+            display: flex;
+            gap: 12px;
+            margin-bottom: 24px;
+            border-bottom: 1px solid var(--border);
+            padding-bottom: 12px;
+        }
+
+        .tab-btn {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border);
+            color: var(--text-muted);
+            padding: 10px 18px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 600;
+            font-size: 14px;
+            transition: all 0.2s;
+        }
+
+        .tab-btn:hover {
+            color: #fff;
+            background: var(--bg-card);
+        }
+
+        .tab-btn.active {
+            background: var(--accent-blue);
+            color: #0f172a;
+            border-color: var(--accent-blue);
+        }
+
+        .tab-content {
+            display: none;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
+        .controls {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 16px;
+            align-items: center;
+            background: var(--bg-secondary);
+            padding: 16px;
+            border-radius: 10px;
+            margin-bottom: 24px;
+            border: 1px solid var(--border);
+        }
+
+        .control-group {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        label {
+            font-size: 13px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            color: var(--text-muted);
+        }
+
+        select {
+            background: var(--bg-card);
+            color: #fff;
+            border: 1px solid var(--border);
+            padding: 8px 14px;
+            border-radius: 6px;
+            font-size: 14px;
+            outline: none;
+        }
+
+        .chart-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(600px, 1fr));
+            gap: 24px;
+            margin-bottom: 32px;
+        }
+
+        .chart-card {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 20px;
+            position: relative;
+        }
+
+        .chart-card h3 {
+            margin: 0 0 16px 0;
+            font-size: 16px;
+            color: #fff;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .badge-nas {
+            background: rgba(239, 68, 68, 0.2);
+            color: #f87171;
+            padding: 3px 8px;
+            border-radius: 4px;
+            font-size: 12px;
+            font-weight: 600;
+            border: 1px solid rgba(239, 68, 68, 0.3);
+        }
+
+        .chart-box {
+            position: relative;
+            height: 360px;
+            width: 100%;
+        }
+
+        .gallery-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+            gap: 20px;
+        }
+
+        .gallery-card {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            overflow: hidden;
+            text-align: center;
+        }
+
+        .gallery-card img {
+            width: 100%;
+            height: auto;
+            display: block;
+            background: #fff;
+        }
+
+        .gallery-card p {
+            padding: 12px;
+            margin: 0;
+            font-weight: 600;
+            font-size: 14px;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            background: var(--bg-secondary);
+            border-radius: 10px;
+            overflow: hidden;
+            font-size: 14px;
+        }
+
+        th, td {
+            padding: 12px 16px;
+            text-align: left;
+            border-bottom: 1px solid var(--border);
+        }
+
+        th {
+            background: var(--bg-card);
+            color: var(--text-muted);
+            font-weight: 600;
+            text-transform: uppercase;
+            font-size: 12px;
+        }
+
+        tr:hover td {
+            background: rgba(255, 255, 255, 0.03);
+        }
+
+        .highlight-nas {
+            color: #f87171;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Novel Algorithmic Similarity (NAS) — Visual Analytics Dashboard</h1>
+            <p class="subtitle">Replication of Birim &amp; Tümtürk (2022) | Benchmark on MovieLens 100K &amp; FilmTrust</p>
+        </header>
+
+        <div class="tabs">
+            <button class="tab-btn active" onclick="switchTab('interactive')">Interactive Charts</button>
+            <button class="tab-btn" onclick="switchTab('gallery')">Publication Figures (1a - 4b)</button>
+            <button class="tab-btn" onclick="switchTab('table')">Tabular Results</button>
+        </div>
+
+        <!-- TAB 1: INTERACTIVE CHARTS -->
+        <div id="interactive" class="tab-content active">
+            <div class="controls">
+                <div class="control-group">
+                    <label for="datasetSelect">Dataset:</label>
+                    <select id="datasetSelect" onchange="updateCharts()">
+                        <option value="ml-100k">MovieLens 100K (ml-100k)</option>
+                        <option value="filmtrust">FilmTrust</option>
+                    </select>
+                </div>
+                <div class="control-group">
+                    <label for="metricFilter">Primary View:</label>
+                    <select id="metricFilter" onchange="filterMetricView()">
+                        <option value="all">All Metrics (2x2 Grid)</option>
+                        <option value="prediction">Prediction Accuracy (MAE &amp; RMSE)</option>
+                        <option value="classification">Classification Accuracy (Recall &amp; Precision)</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="chart-grid">
+                <div class="chart-card" id="card-mae">
+                    <h3>Mean Absolute Error (MAE) <span class="badge-nas">Lower is Better</span></h3>
+                    <div class="chart-box"><canvas id="chart-mae"></canvas></div>
+                </div>
+                <div class="chart-card" id="card-rmse">
+                    <h3>Root Mean Squared Error (RMSE) <span class="badge-nas">Lower is Better</span></h3>
+                    <div class="chart-box"><canvas id="chart-rmse"></canvas></div>
+                </div>
+                <div class="chart-card" id="card-recall">
+                    <h3>Recall @ Threshold T <span class="badge-nas" style="color:#4ade80; background:rgba(34,197,94,0.2); border-color:rgba(34,197,94,0.3)">Higher is Better</span></h3>
+                    <div class="chart-box"><canvas id="chart-recall"></canvas></div>
+                </div>
+                <div class="chart-card" id="card-precision">
+                    <h3>Precision @ Threshold T <span class="badge-nas" style="color:#4ade80; background:rgba(34,197,94,0.2); border-color:rgba(34,197,94,0.3)">Higher is Better</span></h3>
+                    <div class="chart-box"><canvas id="chart-precision"></canvas></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- TAB 2: PUBLICATION FIGURES GALLERY -->
+        <div id="gallery" class="tab-content">
+            <div class="gallery-card" style="margin-bottom: 24px;">
+                <p>Master Comparison Dashboard (All 8 Subplots)</p>
+                <img src="figures/benchmark_comparison_master.png" alt="Master Dashboard">
+            </div>
+            <div class="gallery-grid">
+                <div class="gallery-card">
+                    <img src="figures/Figure_1a_MAE_ml100k.png" alt="Fig 1a">
+                    <p>Figure 1a: MAE vs K (MovieLens 100K)</p>
+                </div>
+                <div class="gallery-card">
+                    <img src="figures/Figure_1b_MAE_filmtrust.png" alt="Fig 1b">
+                    <p>Figure 1b: MAE vs K (FilmTrust)</p>
+                </div>
+                <div class="gallery-card">
+                    <img src="figures/Figure_2a_RMSE_ml100k.png" alt="Fig 2a">
+                    <p>Figure 2a: RMSE vs K (MovieLens 100K)</p>
+                </div>
+                <div class="gallery-card">
+                    <img src="figures/Figure_2b_RMSE_filmtrust.png" alt="Fig 2b">
+                    <p>Figure 2b: RMSE vs K (FilmTrust)</p>
+                </div>
+                <div class="gallery-card">
+                    <img src="figures/Figure_3a_Recall_ml100k.png" alt="Fig 3a">
+                    <p>Figure 3a: Recall vs K (MovieLens 100K)</p>
+                </div>
+                <div class="gallery-card">
+                    <img src="figures/Figure_3b_Recall_filmtrust.png" alt="Fig 3b">
+                    <p>Figure 3b: Recall vs K (FilmTrust)</p>
+                </div>
+                <div class="gallery-card">
+                    <img src="figures/Figure_4a_Precision_ml100k.png" alt="Fig 4a">
+                    <p>Figure 4a: Precision vs K (MovieLens 100K)</p>
+                </div>
+                <div class="gallery-card">
+                    <img src="figures/Figure_4b_Precision_filmtrust.png" alt="Fig 4b">
+                    <p>Figure 4b: Precision vs K (FilmTrust)</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- TAB 3: TABULAR RESULTS -->
+        <div id="table" class="tab-content">
+            <table id="dataTable">
+                <thead>
+                    <tr>
+                        <th>Dataset</th>
+                        <th>Similarity</th>
+                        <th>Metric</th>
+                        <th>K=10</th>
+                        <th>K=20</th>
+                        <th>K=30</th>
+                        <th>K=40</th>
+                        <th>K=60</th>
+                        <th>K=80</th>
+                    </tr>
+                </thead>
+                <tbody id="tableBody"></tbody>
+            </table>
+        </div>
+    </div>
+
+    <script>
+        const STYLES = {
+            'NAS':  { color: '#ef4444', dash: [], width: 3 },
+            'NHSM': { color: '#22c55e', dash: [5, 5], width: 2 },
+            'PIP':  { color: '#f59e0b', dash: [4, 4], width: 2 },
+            'CPC':  { color: '#ec4899', dash: [6, 2], width: 2 },
+            'COS':  { color: '#38bdf8', dash: [], width: 2 },
+            'PCC':  { color: '#a855f7', dash: [2, 2], width: 2 }
+        };
+
+        const K_VALUES = [10, 20, 30, 40, 60, 80];
+        let rawData = [];
+        let chartInstances = {};
+
+        function switchTab(tabId) {
+            document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+            document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+            event.target.classList.add('active');
+            document.getElementById(tabId).classList.add('active');
+        }
+
+        function filterMetricView() {
+            const filter = document.getElementById('metricFilter').value;
+            const cardMae = document.getElementById('card-mae');
+            const cardRmse = document.getElementById('card-rmse');
+            const cardRecall = document.getElementById('card-recall');
+            const cardPrecision = document.getElementById('card-precision');
+
+            if (filter === 'all') {
+                cardMae.style.display = cardRmse.style.display = cardRecall.style.display = cardPrecision.style.display = 'block';
+            } else if (filter === 'prediction') {
+                cardMae.style.display = cardRmse.style.display = 'block';
+                cardRecall.style.display = cardPrecision.style.display = 'none';
+            } else {
+                cardMae.style.display = cardRmse.style.display = 'none';
+                cardRecall.style.display = cardPrecision.style.display = 'block';
+            }
+        }
+
+        async function init() {
+            try {
+                const res = await fetch('results/benchmark_results.csv');
+                const text = await res.text();
+                const lines = text.trim().split('\n');
+                const headers = lines[0].split(',');
+                
+                rawData = lines.slice(1).map(line => {
+                    const parts = line.split(',');
+                    return {
+                        dataset: parts[0],
+                        similarity: parts[1],
+                        K: parseInt(parts[2]),
+                        metric: parts[3],
+                        value: parseFloat(parts[4])
+                    };
+                });
+
+                buildTable();
+                initCharts();
+                updateCharts();
+            } catch (err) {
+                console.error("Error loading benchmark data:", err);
+            }
+        }
+
+        function initCharts() {
+            ['MAE', 'RMSE', 'Recall', 'Precision'].forEach(m => {
+                const ctx = document.getElementById(`chart-${m.toLowerCase()}`).getContext('2d');
+                chartInstances[m] = new Chart(ctx, {
+                    type: 'line',
+                    data: { labels: K_VALUES, datasets: [] },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        interaction: { mode: 'index', intersect: false },
+                        plugins: {
+                            legend: { labels: { color: '#f8fafc', font: { weight: 'bold' } } },
+                            tooltip: { backgroundColor: '#1e293b', titleColor: '#fff', bodyColor: '#cbd5e1' }
+                        },
+                        scales: {
+                            x: {
+                                grid: { color: '#334155' },
+                                ticks: { color: '#94a3b8' },
+                                title: { display: true, text: 'K (Nearest Neighbors)', color: '#94a3b8' }
+                            },
+                            y: {
+                                grid: { color: '#334155' },
+                                ticks: { color: '#94a3b8' },
+                                title: { display: true, text: m.toUpperCase(), color: '#94a3b8' }
+                            }
+                        }
+                    }
+                });
+            });
+        }
+
+        function updateCharts() {
+            const currentDataset = document.getElementById('datasetSelect').value;
+            const metrics = ['MAE', 'RMSE', 'Recall', 'Precision'];
+            const sims = ['NAS', 'NHSM', 'PIP', 'CPC', 'COS', 'PCC'];
+
+            metrics.forEach(metric => {
+                const datasets = sims.map(sim => {
+                    const dataPoints = K_VALUES.map(k => {
+                        const rec = rawData.find(r => r.dataset === currentDataset && r.similarity === sim && r.metric === metric && r.K === k);
+                        return rec ? rec.value : null;
+                    });
+                    const s = STYLES[sim] || { color: '#fff', dash: [], width: 2 };
+                    return {
+                        label: sim,
+                        data: dataPoints,
+                        borderColor: s.color,
+                        backgroundColor: s.color,
+                        borderWidth: s.width,
+                        borderDash: s.dash,
+                        pointRadius: 4,
+                        tension: 0.2
+                    };
+                });
+
+                chartInstances[metric].data.datasets = datasets;
+                chartInstances[metric].update();
+            });
+        }
+
+        function buildTable() {
+            const tbody = document.getElementById('tableBody');
+            tbody.innerHTML = '';
+            const datasets = ['ml-100k', 'filmtrust'];
+            const metrics = ['MAE', 'RMSE', 'Recall', 'Precision'];
+            const sims = ['NAS', 'NHSM', 'PIP', 'CPC', 'COS', 'PCC'];
+
+            datasets.forEach(d => {
+                metrics.forEach(m => {
+                    sims.forEach(s => {
+                        const row = document.createElement('tr');
+                        const isNas = s === 'NAS';
+                        let html = `<td>${d}</td><td class="${isNas ? 'highlight-nas' : ''}">${s}</td><td>${m}</td>`;
+                        K_VALUES.forEach(k => {
+                            const rec = rawData.find(r => r.dataset === d && r.similarity === s && r.metric === m && r.K === k);
+                            html += `<td>${rec ? rec.value.toFixed(4) : '-'}</td>`;
+                        });
+                        row.innerHTML = html;
+                        tbody.appendChild(row);
+                    });
+                });
+            });
+        }
+
+        window.onload = init;
+    </script>
+</body>
+</html>
+
