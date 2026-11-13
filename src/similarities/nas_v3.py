@@ -45,8 +45,9 @@ class NASv3Config:
     # Family E: Case Amplification Predictor
     case_amp_q: float = 1.0
     epsilon_reg: float = 0.001
-    baseline_reg_u: float = 10.0
+    baseline_reg_u: float = 15.0
     baseline_reg_i: float = 25.0
+    blend_baseline_weight: float = 0.30
     predictor_mode: Literal["weighted_average", "resnick", "case_amplification"] = "case_amplification"
 
     # Family F: Katz Trust Fusion
@@ -193,6 +194,13 @@ def compute_nas_v3_similarity(
         PS = np.zeros((n_users, n_users), dtype=np.float64)
         R_med_sign = np.where(mask > 0, np.sign(R - r_med), 0.0)
 
+        p = cfg.dist_p
+        rho = cfg.rho_raw_vs_dev
+        zeta = cfg.ps_zeta
+        xi = cfg.cross_median_penalty_xi
+        has_xi = xi > 0
+        xi_mult = np.exp(-xi) if has_xi else 1.0
+
         for u in range(n_users):
             rated_idx = np.flatnonzero(mask[u])
             if rated_idx.size == 0:
@@ -204,15 +212,22 @@ def compute_nas_v3_similarity(
             c_v = R_centered[:, rated_idx]
             w_sub = w_item[rated_idx][None, :] * m_sub
 
-            raw_diff = np.abs(r_u - r_v) ** cfg.dist_p
-            dev_diff = np.abs(c_u - c_v) ** cfg.dist_p
-            d_j = cfg.rho_raw_vs_dev * raw_diff + (1.0 - cfg.rho_raw_vs_dev) * dev_diff
+            if p == 1.0:
+                raw_diff = np.abs(r_u - r_v)
+                dev_diff = np.abs(c_u - c_v)
+            elif p == 2.0:
+                raw_diff = (r_u - r_v) ** 2
+                dev_diff = (c_u - c_v) ** 2
+            else:
+                raw_diff = np.abs(r_u - r_v) ** p
+                dev_diff = np.abs(c_u - c_v) ** p
 
-            kernel = 2.0 / (1.0 + np.exp(np.clip(cfg.ps_zeta * d_j, -50.0, 50.0)))
+            d_j = rho * raw_diff + (1.0 - rho) * dev_diff
+            kernel = 2.0 / (1.0 + np.exp(np.clip(zeta * d_j, -50.0, 50.0)))
 
-            if cfg.cross_median_penalty_xi > 0:
+            if has_xi:
                 sign_prod = R_med_sign[u, rated_idx][None, :] * R_med_sign[:, rated_idx]
-                penalty = np.where(sign_prod < 0, np.exp(-cfg.cross_median_penalty_xi), 1.0)
+                penalty = np.where(sign_prod < 0, xi_mult, 1.0)
                 kernel = kernel * penalty
 
             w_sum = w_sub.sum(axis=1)
@@ -260,7 +275,8 @@ def predict_ratings_v3(
     cfg: NASv3Config = NASv3Config(),
     r_min: float = 1.0,
     r_max: float = 5.0,
-    clip_ratings: bool = True
+    clip_ratings: bool = True,
+    sim_base: Optional[np.ndarray] = None
 ) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
     """
     Predicts holdout ratings for evaluated pairs with support for:
@@ -279,6 +295,11 @@ def predict_ratings_v3(
             R_train, reg_u=cfg.baseline_reg_u, reg_i=cfg.baseline_reg_i
         )
         b_mat = mu + b_u[:, None] + b_i[None, :]
+
+        # If baseline blending is active, ensure sim_base is available
+        if cfg.blend_baseline_weight > 0 and sim_base is None:
+            from src.similarities.nas_v2 import compute_nas_v2_matrix
+            sim_base = compute_nas_v2_matrix(R_train, variant="tau", tau_prox=1.0, tau_sing=1.0)
 
         q = cfg.case_amp_q
         eps_reg = cfg.epsilon_reg
@@ -308,7 +329,14 @@ def predict_ratings_v3(
                 r_cand = R_train[cands, p]
                 b_cand = b_mat[cands, p]
                 norm_r = (r_cand - b_cand) / std_u[cands]
-                pred = b_ui + std_u[u] * (np.sum(weights * norm_r) / (eps_reg + sum_weights))
+                pred_case = b_ui + std_u[u] * (np.sum(weights * norm_r) / (eps_reg + sum_weights))
+                if cfg.blend_baseline_weight > 0 and sim_base is not None:
+                    c_sim_base = sim_base[u, cands]
+                    sum_base = np.sum(np.abs(c_sim_base))
+                    pred_base = (np.sum(c_sim_base * r_cand) / sum_base) if sum_base > 1e-9 else b_ui
+                    pred = (1.0 - cfg.blend_baseline_weight) * pred_case + cfg.blend_baseline_weight * pred_base
+                else:
+                    pred = pred_case
 
             if clip_ratings:
                 pred = np.clip(pred, r_min, r_max)
