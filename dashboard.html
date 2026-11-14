@@ -344,7 +344,8 @@
 
     <script>
         const STYLES = {
-            'NAS':  { color: '#ef4444', dash: [], width: 3 },
+            'I-NAS': { color: '#10b981', dash: [], width: 3.5 },
+            'NAS':  { color: '#ef4444', dash: [], width: 2.5 },
             'NHSM': { color: '#22c55e', dash: [5, 5], width: 2 },
             'PIP':  { color: '#f59e0b', dash: [4, 4], width: 2 },
             'CPC':  { color: '#ec4899', dash: [6, 2], width: 2 },
@@ -441,7 +442,7 @@
         function updateCharts() {
             const currentDataset = document.getElementById('datasetSelect').value;
             const metrics = ['MAE', 'RMSE', 'Recall', 'Precision'];
-            const sims = ['NAS', 'NHSM', 'PIP', 'CPC', 'COS', 'PCC'];
+            const sims = ['I-NAS', 'NAS', 'NHSM', 'PIP', 'CPC', 'COS', 'PCC'];
 
             metrics.forEach(metric => {
                 const datasets = sims.map(sim => {
@@ -472,13 +473,13 @@
             tbody.innerHTML = '';
             const datasets = ['ml-100k', 'filmtrust'];
             const metrics = ['MAE', 'RMSE', 'Recall', 'Precision'];
-            const sims = ['NAS', 'NHSM', 'PIP', 'CPC', 'COS', 'PCC'];
+            const sims = ['I-NAS', 'NAS', 'NHSM', 'PIP', 'CPC', 'COS', 'PCC'];
 
             datasets.forEach(d => {
                 metrics.forEach(m => {
                     sims.forEach(s => {
                         const row = document.createElement('tr');
-                        const isNas = s === 'NAS';
+                        const isNas = s === 'NAS' || s === 'I-NAS';
                         let html = `<td>${d}</td><td class="${isNas ? 'highlight-nas' : ''}">${s}</td><td>${m}</td>`;
                         K_VALUES.forEach(k => {
                             const rec = rawData.find(r => r.dataset === d && r.similarity === s && r.metric === m && r.K === k);
