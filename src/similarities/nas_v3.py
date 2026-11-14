@@ -291,15 +291,32 @@ def predict_ratings_v3(
 
     if cfg.predictor_mode == "case_amplification":
         # Precompute global baseline and variances on R_train
-        mu, b_u, b_i, std_u = compute_global_baseline(
+        mu, b_u_train, b_i, std_u_train = compute_global_baseline(
             R_train, reg_u=cfg.baseline_reg_u, reg_i=cfg.baseline_reg_i
         )
-        b_mat = mu + b_u[:, None] + b_i[None, :]
+        b_mat_train = mu + b_u_train[:, None] + b_i[None, :]
+
+        # Test user baseline and standard deviations
+        if R_test_train.shape[0] == R_train.shape[0] and np.array_equal(R_test_train, R_train):
+            b_mat_test = b_mat_train
+            std_u_test = std_u_train
+        else:
+            mask_te = R_test_train > 0
+            u_cnt_te = np.maximum(mask_te.sum(axis=1), 1.0)
+            b_u_test = np.where(
+                mask_te.sum(axis=1) > 0,
+                ((R_test_train - mu - b_i[None, :]) * mask_te).sum(axis=1) / (u_cnt_te + cfg.baseline_reg_u),
+                0.0
+            )
+            dev_u_te = np.where(mask_te, (R_test_train - (mu + b_u_test[:, None] + b_i[None, :])) ** 2, 0.0)
+            std_u_test = np.sqrt(dev_u_te.sum(axis=1) / u_cnt_te)
+            std_u_test = np.where(std_u_test < 1e-4, 1.0, std_u_test)
+            b_mat_test = mu + b_u_test[:, None] + b_i[None, :]
 
         # If baseline blending is active, ensure sim_base is available
         if cfg.blend_baseline_weight > 0 and sim_base is None:
-            from src.similarities.nas_v2 import compute_nas_v2_matrix
-            sim_base = compute_nas_v2_matrix(R_train, variant="tau", tau_prox=1.0, tau_sing=1.0)
+            from src.similarities.nas import compute_nas_matrix
+            sim_base = compute_nas_matrix(R_query=R_test_train, R_ref=R_train)
 
         q = cfg.case_amp_q
         eps_reg = cfg.epsilon_reg
@@ -307,7 +324,7 @@ def predict_ratings_v3(
         for idx in range(N_eval):
             u = test_u_indices[idx]
             p = test_i_indices[idx]
-            b_ui = b_mat[u, p]
+            b_ui = b_mat_test[u, p]
 
             cands = np.where(R_train[:, p] > 0)[0]
             if len(cands) == 0:
@@ -327,9 +344,9 @@ def predict_ratings_v3(
                 pred = b_ui
             else:
                 r_cand = R_train[cands, p]
-                b_cand = b_mat[cands, p]
-                norm_r = (r_cand - b_cand) / std_u[cands]
-                pred_case = b_ui + std_u[u] * (np.sum(weights * norm_r) / (eps_reg + sum_weights))
+                b_cand = b_mat_train[cands, p]
+                norm_r = (r_cand - b_cand) / std_u_train[cands]
+                pred_case = b_ui + std_u_test[u] * (np.sum(weights * norm_r) / (eps_reg + sum_weights))
                 if cfg.blend_baseline_weight > 0 and sim_base is not None:
                     c_sim_base = sim_base[u, cands]
                     sum_base = np.sum(np.abs(c_sim_base))
