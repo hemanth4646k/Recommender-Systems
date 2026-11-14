@@ -83,6 +83,20 @@ def compute_similarity(
             r_med=r_med,
             item_means=item_means
         )
+    elif sim_name == "I-NAS":
+        from src.similarities.nas_v3 import compute_nas_v3_similarity, NASv3Config
+        cfg = NASv3Config(
+            alpha_ps=1.25, beta_svs=0.50, gamma_ovl=0.35, blend_mode="multiplicative",
+            svs_mode="dual", eta_disp=0.5, eta_mean=0.2, overlap_type="shrinkage",
+            shrinkage_tau=12.0, tversky_theta=0.8, dist_p=1.0, rho_raw_vs_dev=0.70,
+            ps_zeta=1.5, cross_median_penalty_xi=0.5, var_weight_kappa=0.0, use_surprisal=True,
+            predictor_mode="case_amplification", case_amp_q=1.0, epsilon_reg=0.001,
+            baseline_reg_u=15.0, baseline_reg_i=25.0, blend_baseline_weight=0.35,
+            use_trust=False
+        )
+        R_comb = np.vstack([R_test_train, R_train])
+        sim_comb = compute_nas_v3_similarity(R_comb, r_med=r_med, cfg=cfg)
+        return sim_comb[:len(R_test_train), len(R_test_train):]
     else:
         raise ValueError(f"Unknown similarity metric: {sim_name}")
 
@@ -146,17 +160,39 @@ def run_benchmark(
             
             # 5. Evaluate for each K
             for k in k_values:
-                u_idx, i_idx, actual, predicted = predict_ratings(
-                    sim_matrix=sim_mat,
-                    R_train=R_train,
-                    R_test_train=R_test_train,
-                    R_test_eval=R_test_eval,
-                    K=k,
-                    method=method,
-                    r_min=r_min,
-                    r_max=r_max,
-                    r_med=r_med
-                )
+                if sim_name == "I-NAS":
+                    from src.similarities.nas_v3 import predict_ratings_v3, NASv3Config
+                    cfg_inas = NASv3Config(
+                        alpha_ps=1.25, beta_svs=0.50, gamma_ovl=0.35, blend_mode="multiplicative",
+                        svs_mode="dual", eta_disp=0.5, eta_mean=0.2, overlap_type="shrinkage",
+                        shrinkage_tau=12.0, tversky_theta=0.8, dist_p=1.0, rho_raw_vs_dev=0.70,
+                        ps_zeta=1.5, cross_median_penalty_xi=0.5, var_weight_kappa=0.0, use_surprisal=True,
+                        predictor_mode="case_amplification", case_amp_q=1.0, epsilon_reg=0.001,
+                        baseline_reg_u=15.0, baseline_reg_i=25.0, blend_baseline_weight=0.35,
+                        use_trust=False
+                    )
+                    u_idx, i_idx, actual, predicted = predict_ratings_v3(
+                        sim_matrix=sim_mat,
+                        R_train=R_train,
+                        R_test_train=R_test_train,
+                        R_test_eval=R_test_eval,
+                        K=k,
+                        cfg=cfg_inas,
+                        r_min=r_min,
+                        r_max=r_max
+                    )
+                else:
+                    u_idx, i_idx, actual, predicted = predict_ratings(
+                        sim_matrix=sim_mat,
+                        R_train=R_train,
+                        R_test_train=R_test_train,
+                        R_test_eval=R_test_eval,
+                        K=k,
+                        method=method,
+                        r_min=r_min,
+                        r_max=r_max,
+                        r_med=r_med
+                    )
                 
                 metrics = evaluate_predictions(
                     user_indices=u_idx,
@@ -186,6 +222,15 @@ def run_benchmark(
     fig_paths = generate_all_paper_figures(df_results, output_dir=figures_dir)
     for fig_name, fig_path in fig_paths.items():
         print(f"  - Generated: {fig_path}")
+        
+    # Generate dedicated I-NAS vs Baseline NAS figures
+    from src.visualize import generate_inas_vs_baseline_figures
+    try:
+        inas_figs = generate_inas_vs_baseline_figures(output_dir=figures_dir)
+        for fig_name, fig_path in inas_figs.items():
+            print(f"  - Generated dedicated I-NAS figure: {fig_path}")
+    except Exception as e:
+        print(f"  - Note on dedicated I-NAS figures: {e}")
         
     return df_results
 

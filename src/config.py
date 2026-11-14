@@ -42,7 +42,7 @@ DATASET_CONFIGS: Dict[str, DatasetConfig] = {
 
 # Experimental Hyperparameters
 K_VALUES: List[int] = [10, 20, 30, 40, 60, 80]
-SIMILARITY_METRICS: List[str] = ["COS", "CPC", "NAS", "NHSM", "PCC", "PIP"]
+SIMILARITY_METRICS: List[str] = ["COS", "CPC", "NAS", "NHSM", "PCC", "PIP", "I-NAS"]
 EVALUATION_METRICS: List[str] = ["MAE", "RMSE", "Recall", "Precision"]
 
 TRAIN_USER_RATIO: float = 0.70
